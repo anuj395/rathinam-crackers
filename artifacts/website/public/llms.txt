@@ -1,0 +1,38 @@
+# Rathinam Crackers
+
+> PESO-licensed online cracker shop based in Sivakasi, Tamil Nadu, India.
+> We sell family fireworks, gift boxes and bulk orders for weddings and
+> festivals, shipped pan-India with proper GST invoices.
+
+## About
+- Location: Sivakasi, Tamil Nadu, India — the fireworks capital of India.
+- Licence: PESO (Petroleum and Explosives Safety Organisation) compliant.
+- Ships to: All Indian states where fireworks delivery is legally permitted.
+- Payments: Cash on delivery and bank transfer.
+- Invoices: Full GST invoices (CGST + SGST intra-state, IGST inter-state).
+
+## What we sell
+- Sparklers, ground chakkars, flower pots, sky shots, aerial cakes,
+  rockets, novelty crackers, kids' fireworks, and curated gift boxes.
+- In-house brand "Rathinam" plus selected partner brands hand-crafted
+  in Sivakasi.
+
+## How to order
+1. Browse the catalogue at /website/catalogue
+2. Pick variants and quantities, add to cart
+3. Checkout with name, phone and shipping address — guest checkout, no
+   account required
+4. We confirm the order by phone within 24 hours
+
+## Bulk / wedding orders
+- 10+ units of the same item automatically get the wholesale rate.
+- Very large orders: please call us first.
+
+## Pages
+- Home: /website/
+- Catalogue: /website/catalogue
+- Help & FAQ: /website/help
+
+## Contact
+- Phone: +91 99999 99999
+- Email: support@rathinamcracker.com
