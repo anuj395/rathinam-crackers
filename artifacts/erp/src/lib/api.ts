@@ -51,5 +51,10 @@ export function mediaUrl(u: string | null | undefined): string {
   if (!u) return "";
   if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
   if (!u.startsWith("/")) return u;
+  // Vite dev resolves local imports to paths like `/@fs/...` or `/@id/...`.
+  // Those are not API-hosted — return unchanged so the dev server serves them
+  // from the frontend origin. Also if API_BASE is empty (same-origin),
+  // return the path unchanged.
+  if (u.startsWith("/@") || !API_BASE) return u;
   return `${API_BASE}${u}`;
 }

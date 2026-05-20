@@ -32,5 +32,6 @@ export function mediaUrl(u: string | null | undefined): string {
   if (!u) return "";
   if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
   if (!u.startsWith("/")) return u;
+  if (u.startsWith("/@") || !API_BASE) return u;
   return `${API_BASE}${u}`;
 }
