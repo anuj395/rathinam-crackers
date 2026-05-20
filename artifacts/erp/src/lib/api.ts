@@ -52,9 +52,9 @@ export function mediaUrl(u: string | null | undefined): string {
   if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
   if (!u.startsWith("/")) return u;
   // Vite dev resolves local imports to paths like `/@fs/...` or `/@id/...`.
-  // Those are not API-hosted — return unchanged so the dev server serves them
-  // from the frontend origin. Also if API_BASE is empty (same-origin),
-  // return the path unchanged.
-  if (u.startsWith("/@") || !API_BASE) return u;
+  // Static frontend assets live under `/assets/...` and should be served
+  // by the frontend origin. API-hosted uploads (e.g. `/uploads/...`) must
+  // be prefixed with `API_BASE` in production.
+  if (u.startsWith("/@") || u.startsWith("/assets/") || !API_BASE) return u;
   return `${API_BASE}${u}`;
 }
