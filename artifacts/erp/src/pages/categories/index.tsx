@@ -50,20 +50,16 @@ const emptyForm: CategoryForm = {
   isActive: true,
 };
 
-const apiFetch = async (url: string, init?: RequestInit) => {
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$|\/$/, "");
+
+async function apiFetch(path: string, init?: RequestInit) {
   const token = localStorage.getItem("erp_token") || "";
-  const r = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers || {}),
-    },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body?.error?.message || `HTTP ${r.status}`);
+  const headers = { "Content-Type": "application/json", ...(init?.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
   return body;
-};
+}
 
 export default function CategoriesPage() {
   const { toast } = useToast();

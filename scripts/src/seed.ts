@@ -1,17 +1,43 @@
-import {
-  db,
-  usersTable,
-  locationsTable,
-  productsTable,
-  customersTable,
-  suppliersTable,
-  agentsTable,
-  settingsTable,
-  priceListsTable,
-} from "@workspace/db";
-import bcrypt from "bcryptjs";
+// Runtime placeholders — real imports are resolved inside `seed()` to avoid
+// using top-level `await` which can trigger editor / TS server errors.
+let bcrypt: any;
+let dbModule: any;
+let db: any;
+let usersTable: any;
+let locationsTable: any;
+let productsTable: any;
+let customersTable: any;
+let suppliersTable: any;
+let agentsTable: any;
+let settingsTable: any;
+let priceListsTable: any;
 
 async function seed() {
+  // Resolve runtime-only imports here (no top-level await).
+  try {
+    bcrypt = (await import("bcryptjs")).default ?? (await import("bcryptjs"));
+  } catch (err) {
+    bcrypt = (await import("bcryptjs/umd/index.js")).default ?? (await import("bcryptjs/umd/index.js"));
+  }
+
+  try {
+    dbModule = await import("@workspace/db");
+  } catch (err) {
+    dbModule = await import("../../lib/db/src/index.ts");
+  }
+
+  ({
+    db,
+    usersTable,
+    locationsTable,
+    productsTable,
+    customersTable,
+    suppliersTable,
+    agentsTable,
+    settingsTable,
+    priceListsTable,
+  } = dbModule);
+
   console.log("Seeding database...");
 
   // Settings

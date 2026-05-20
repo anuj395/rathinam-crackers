@@ -47,9 +47,11 @@ const emptyForm: FormState = {
   isActive: true,
 };
 
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$|\/$/, "");
+
 const apiFetch = async (url: string, init?: RequestInit) => {
   const token = localStorage.getItem("erp_token") || "";
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}${url}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
