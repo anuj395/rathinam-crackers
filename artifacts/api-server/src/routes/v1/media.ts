@@ -6,6 +6,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { authenticate, requireRole, type AuthRequest } from "../../middleware/authenticate.js";
 import { db, mediaTable } from "@workspace/db";
+import { uploadToS3, deleteFromS3, s3PublicUrl, REGION as S3_REGION, getPresignedGetUrl } from "../../lib/s3.js";
 import { desc, eq, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -71,7 +72,6 @@ router.get(
     const limit = Math.min(Math.max(Number(req.query.limit) || 60, 1), 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const folder = typeof req.query.folder === "string" ? req.query.folder : null;
-
     const [rows, totalRow] = await Promise.all([
       folder
         ? db.select().from(mediaTable).where(eq(mediaTable.folder, folder)).orderBy(desc(mediaTable.createdAt)).limit(limit).offset(offset)
@@ -79,7 +79,28 @@ router.get(
       db.select({ n: sql<number>`count(*)::int` }).from(mediaTable),
     ]);
 
-    res.json({ success: true, data: rows, total: totalRow[0]?.n ?? 0, limit, offset });
+    // If uploads are stored in S3, generate short-lived presigned GET URLs
+    // for each row on every read. This ensures older rows (which may have
+    // stored plain S3 object URLs) become accessible in the browser.
+    const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+    let outRows = rows;
+    if (USE_S3 && rows.length > 0) {
+      const bucket = process.env.AWS_S3_BUCKET!;
+      outRows = await Promise.all(
+        rows.map(async (r: any) => {
+          try {
+            const presigned = await getPresignedGetUrl(bucket, r.filename, 3600);
+            const thumb = await getPresignedGetUrl(bucket, r.filename.replace(/\.webp$/, "_thumb.webp"), 3600);
+            return { ...r, url: presigned, thumbnailUrl: thumb };
+          } catch (err) {
+            req.log.warn({ err, key: r.filename }, "presign failed, falling back to stored urls");
+            return r;
+          }
+        }),
+      );
+    }
+
+    res.json({ success: true, data: outRows, total: totalRow[0]?.n ?? 0, limit, offset });
   },
 );
 
@@ -149,17 +170,36 @@ router.post(
       const fullBuf = await pipeline.clone().resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
       const thumbBuf = await pipeline.clone().resize({ width: 400, height: 400, fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
 
-      await fs.writeFile(fullPath, fullBuf);
-      await fs.writeFile(thumbPath, thumbBuf);
-      fullBytes = fullBuf.length;
+      const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+      if (USE_S3) {
+        const bucket = process.env.AWS_S3_BUCKET!;
+        await uploadToS3(bucket, fullName, fullBuf, "image/webp");
+        await uploadToS3(bucket, thumbName, thumbBuf, "image/webp");
+        fullBytes = fullBuf.length;
+      } else {
+        await fs.writeFile(fullPath, fullBuf);
+        await fs.writeFile(thumbPath, thumbBuf);
+        fullBytes = fullBuf.length;
+      }
     } catch (err) {
       req.log.error({ err }, "media upload encode failed");
       res.status(400).json({ success: false, error: { code: "ENCODE_FAILED", message: "Could not process image — is it corrupt?" } });
       return;
     }
 
-    const url = `/uploads/${fullName}`;
-    const thumbnailUrl = `/uploads/${thumbName}`;
+    const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+    let url: string;
+    let thumbnailUrl: string;
+    if (USE_S3) {
+      const bucket = process.env.AWS_S3_BUCKET!;
+      // Use presigned GET URLs so objects can be read even if the bucket
+      // blocks public ACLs / public access. These URLs expire after 1 hour.
+      url = await getPresignedGetUrl(bucket, fullName, 3600);
+      thumbnailUrl = await getPresignedGetUrl(bucket, thumbName, 3600);
+    } else {
+      url = `/uploads/${fullName}`;
+      thumbnailUrl = `/uploads/${thumbName}`;
+    }
 
     const [row] = await db
       .insert(mediaTable)
@@ -196,12 +236,21 @@ router.delete(
 
     // Best-effort unlink — if the file is already gone (manual cleanup, disk
     // wipe, etc.) we still want the row deletion to succeed.
+    const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
     for (const name of [row.filename, row.filename.replace(/\.webp$/, "_thumb.webp")]) {
-      const p = path.join(UPLOAD_DIR, name);
-      try {
-        await fs.unlink(p);
-      } catch (err) {
-        req.log.warn({ err, path: p }, "media file unlink skipped");
+      if (USE_S3) {
+        try {
+          await deleteFromS3(process.env.AWS_S3_BUCKET!, name);
+        } catch (err) {
+          req.log.warn({ err, key: name }, "s3 delete skipped");
+        }
+      } else {
+        const p = path.join(UPLOAD_DIR, name);
+        try {
+          await fs.unlink(p);
+        } catch (err) {
+          req.log.warn({ err, path: p }, "media file unlink skipped");
+        }
       }
     }
 

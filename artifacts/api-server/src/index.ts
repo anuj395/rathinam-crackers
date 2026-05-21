@@ -1,3 +1,27 @@
+// Load `.env` for development. Prefer package-local `.env`, else fall back
+// to repository root `.env` so running from the package folder still picks
+// up the project's root .env file.
+import { config as dotenvConfig } from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Walk up from this file's directory looking for a .env file (max 6 levels).
+const startDir = path.dirname(fileURLToPath(import.meta.url));
+console.error(`[env] startDir=${startDir}`);
+let dir = startDir;
+for (let i = 0; i < 6; i++) {
+  const candidate = path.join(dir, ".env");
+  if (fs.existsSync(candidate)) {
+    dotenvConfig({ path: candidate });
+    console.error(`[env] loaded ${candidate}`);
+    break;
+  }
+  const parent = path.resolve(dir, "..");
+  if (parent === dir) break;
+  dir = parent;
+}
+console.error(`[env] dotenv search finished, process.env.DATABASE_URL=${process.env.DATABASE_URL ? '[SET]' : '[MISSING]'}`);
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startSystemHealthScheduler } from "./lib/system-health";

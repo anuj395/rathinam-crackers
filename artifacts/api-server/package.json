@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "export NODE_ENV=development E2E_TEST_HOOKS=1 && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
+    "start": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config --enable-source-maps ./dist/index.mjs",
     "seed": "tsx ./src/scripts/seed.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -25,6 +25,9 @@
     "pino": "^9",
     "pino-http": "^10",
     "sharp": "^0.34.5",
+    "dotenv": "^16.3.1",
+    "@aws-sdk/client-s3": "^3.433.0",
+    "@aws-sdk/s3-request-presigner": "^3.433.0",
     "zod": "catalog:"
   },
   "devDependencies": {
