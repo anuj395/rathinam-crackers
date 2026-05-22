@@ -41,6 +41,11 @@ async function ensureUploadDir(): Promise<void> {
 
 const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 12);
 
+// Optional base URL for public S3/CloudFront usage. If set, this value
+// will be used to construct public object URLs (useful for custom domains
+// or CloudFront fronting the S3 bucket). Trailing slash is removed.
+const S3_BASE_URL = (process.env.AWS_S3_BASE_URL ?? "").replace(/\/$/, "");
+
 // Anything bigger than 8 MB is almost certainly an unoptimised camera dump —
 // reject early so we don't bloat the disk. Sharp will further re-encode and
 // usually shrink the on-disk copy by 50-70 % anyway.
@@ -79,21 +84,41 @@ router.get(
       db.select({ n: sql<number>`count(*)::int` }).from(mediaTable),
     ]);
 
-    // If uploads are stored in S3, generate short-lived presigned GET URLs
-    // for each row on every read. This ensures older rows (which may have
-    // stored plain S3 object URLs) become accessible in the browser.
+    // If uploads are stored in S3, return URLs the frontend can fetch.
+    // Behavior controlled by `AWS_S3_PUBLIC` env var:
+    //  - if `AWS_S3_PUBLIC=true` return the public S3 object URL
+    //  - otherwise return presigned GET URLs (default, secure)
     const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+    const S3_PUBLIC = String(process.env.AWS_S3_PUBLIC ?? "false").toLowerCase() === "true";
     let outRows = rows;
     if (USE_S3 && rows.length > 0) {
       const bucket = process.env.AWS_S3_BUCKET!;
       outRows = await Promise.all(
         rows.map(async (r: any) => {
           try {
+            // If the DB already contains an absolute URL (http/https), respect it.
+            if (typeof r.url === "string" && /^https?:\/\//.test(r.url)) {
+              return r;
+            }
+
+            // If an explicit base URL is provided, prefer it for returned URLs
+            if (S3_BASE_URL.length > 0) {
+              const pub = `${S3_BASE_URL}/${r.filename}`;
+              const thumb = `${S3_BASE_URL}/${r.filename.replace(/\.webp$/, "_thumb.webp")}`;
+              return { ...r, url: pub, thumbnailUrl: thumb };
+            }
+            if (S3_PUBLIC) {
+              const pub = s3PublicUrl(bucket, S3_REGION, r.filename);
+              const thumb = s3PublicUrl(bucket, S3_REGION, r.filename.replace(/\.webp$/, "_thumb.webp"));
+              return { ...r, url: pub, thumbnailUrl: thumb };
+            }
+
+            // Private bucket: presign the stored logical path (we use filename)
             const presigned = await getPresignedGetUrl(bucket, r.filename, 3600);
             const thumb = await getPresignedGetUrl(bucket, r.filename.replace(/\.webp$/, "_thumb.webp"), 3600);
             return { ...r, url: presigned, thumbnailUrl: thumb };
           } catch (err) {
-            req.log.warn({ err, key: r.filename }, "presign failed, falling back to stored urls");
+            req.log.warn({ err, key: r.filename }, "presign/public URL failed, falling back to stored urls");
             return r;
           }
         }),
@@ -171,6 +196,7 @@ router.post(
       const thumbBuf = await pipeline.clone().resize({ width: 400, height: 400, fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
 
       const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+      const S3_PUBLIC = String(process.env.AWS_S3_PUBLIC ?? "false").toLowerCase() === "true";
       if (USE_S3) {
         const bucket = process.env.AWS_S3_BUCKET!;
         await uploadToS3(bucket, fullName, fullBuf, "image/webp");
@@ -188,14 +214,25 @@ router.post(
     }
 
     const USE_S3 = Boolean(process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.length > 0);
+    const S3_PUBLIC = String(process.env.AWS_S3_PUBLIC ?? "false").toLowerCase() === "true";
     let url: string;
     let thumbnailUrl: string;
     if (USE_S3) {
       const bucket = process.env.AWS_S3_BUCKET!;
-      // Use presigned GET URLs so objects can be read even if the bucket
-      // blocks public ACLs / public access. These URLs expire after 1 hour.
-      url = await getPresignedGetUrl(bucket, fullName, 3600);
-      thumbnailUrl = await getPresignedGetUrl(bucket, thumbName, 3600);
+      // Prefer an explicit S3 base URL when provided. This allows using
+      // a custom domain or the S3 bucket URL from env (e.g. https://rathinam-media.s3....)
+      if (S3_BASE_URL.length > 0) {
+        url = `${S3_BASE_URL}/${fullName}`;
+        thumbnailUrl = `${S3_BASE_URL}/${thumbName}`;
+      } else if (S3_PUBLIC) {
+        // If the bucket is public and no base URL provided, construct the S3 URL
+        url = s3PublicUrl(bucket, S3_REGION, fullName);
+        thumbnailUrl = s3PublicUrl(bucket, S3_REGION, thumbName);
+      } else {
+        // private bucket: store a stable logical path and presign on read
+        url = `/uploads/${fullName}`;
+        thumbnailUrl = `/uploads/${thumbName}`;
+      }
     } else {
       url = `/uploads/${fullName}`;
       thumbnailUrl = `/uploads/${thumbName}`;
