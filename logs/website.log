@@ -1,0 +1,15 @@
+
+> @workspace/website@0.0.0 dev /Users/sta/Documents/rathinam-crackers/artifacts/website
+> vite --config vite.config.ts --host 0.0.0.0
+
+
+  VITE v7.3.2  ready in 309 ms
+
+  ➜  Local:   http://localhost:19004/website
+  ➜  Network: http://10.5.51.201:19004/website
+  ➜  Network: http://192.168.2.1:19004/website
+12:03:21 PM [vite] (client) page reload src/lib/api.ts
+12:09:45 PM [vite] (client) page reload src/lib/api.ts
+12:12:28 PM [vite] (client) page reload src/lib/api.ts
+12:13:17 PM [vite] (client) page reload src/lib/api.ts
+ ELIFECYCLE  Command failed with exit code 143.

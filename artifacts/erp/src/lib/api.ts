@@ -53,8 +53,32 @@ export function mediaUrl(u: string | null | undefined): string {
   if (!u.startsWith("/")) return u;
   // Vite dev resolves local imports to paths like `/@fs/...` or `/@id/...`.
   // Static frontend assets live under `/assets/...` and should be served
-  // by the frontend origin. API-hosted uploads (e.g. `/uploads/...`) must
-  // be prefixed with `API_BASE` in production.
-  if (u.startsWith("/@") || u.startsWith("/assets/") || !API_BASE) return u;
+  // from the frontend base (import.meta.env.BASE_URL). API-hosted uploads
+  // (e.g. `/uploads/...`) must be prefixed with `API_BASE` in production.
+  const baseUrl = (import.meta.env.BASE_URL as string | undefined) ?? "/";
+  const basePrefix = baseUrl.replace(/\/$/, "");
+
+  if (u.startsWith("/@")) return u;
+  // Vite sometimes serves files outside the project root via `/@fs/abs/path` or `/fs/abs/path`.
+  // Normalize any `/.../assets/...` occurrence so imported images resolve to `/assets/...`.
+  // If the path contains `/assets/` anywhere (e.g. `/fs/.../assets/...` or
+  // `/website/@fs/.../assets/...`) normalize to a frontend-relative
+  // `/assets/...` URL so the browser requests the asset from the frontend
+  // host + base path rather than leaking local FS paths.
+  const assetsIdx = u.lastIndexOf("/assets/");
+  if (assetsIdx !== -1) {
+    const basename = u.slice(assetsIdx + "/assets/".length);
+    if (import.meta.env.DEV) {
+      return `${basePrefix}/${basename}`.replace(/\/+/g, "/");
+    }
+    return `${basePrefix}${u.slice(assetsIdx)}`;
+  }
+  if (u.startsWith("/@fs/") || u.startsWith("/fs/") || u.startsWith("/@id/")) {
+    // No `/assets/` segment found; fall back to returning the raw path so
+    // Vite can serve it during dev via its internal handlers.
+    return u;
+  }
+  if (u.startsWith("/assets/")) return `${basePrefix}${u}`;
+  if (!API_BASE) return u;
   return `${API_BASE}${u}`;
 }

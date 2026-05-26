@@ -1,0 +1,7 @@
+## Auto-generated replace file for git-filter-repo
+## Format: exact_secret==>REMOVED_IN_REPO
+## REVIEW THIS FILE LOCALLY BEFORE RUNNING ANY HISTORY REWRITE
+
+# Values taken from tools/secrets-patterns.txt (review & edit if needed)
+postgresql://neondb_owner:npg_2RMXN8ocAyGD@ep-divine-cloud-aolu9rjm-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require==>REMOVED_IN_REPO
+change_this_to_a_secure_32_char_secret_for_local_dev_1234567890abcd==>REMOVED_IN_REPO

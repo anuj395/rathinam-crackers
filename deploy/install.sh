@@ -166,13 +166,14 @@ SESSION_SECRET=${SESSION_SECRET}
 JWT_SECRET=${JWT_SECRET}
 ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
 APP_DOMAIN=${APP_DOMAIN}
-PUBLIC_API_BASE=${API_BASE}
 # UPLOAD_DIR is read by the API to persist uploaded media (see
 # artifacts/api-server/src/routes/v1/media.ts). nginx serves the same
 # folder directly via the /uploads/ alias for hot-cached delivery.
 UPLOAD_DIR=${UPLOADS_DIR}
+PUBLIC_API_BASE=${API_BASE}
 # Build-time variables consumed by Vite (frontends).
-VITE_API_BASE=${API_BASE}
+# Use VITE_API_URL to match frontend expectations (they read VITE_API_URL).
+VITE_API_URL=${API_BASE}
 EOF
 chmod 0600 "$ENV_FILE"
 chown root:root "$ENV_FILE"

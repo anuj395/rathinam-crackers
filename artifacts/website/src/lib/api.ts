@@ -32,6 +32,22 @@ export function mediaUrl(u: string | null | undefined): string {
   if (!u) return "";
   if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
   if (!u.startsWith("/")) return u;
-  if (u.startsWith("/@") || u.startsWith("/assets/") || !API_BASE) return u;
+  const baseUrl = (import.meta.env.BASE_URL as string | undefined) ?? "/";
+  const basePrefix = baseUrl.replace(/\/$/, "");
+
+  if (u.startsWith("/@")) return u;
+  // If the incoming URL contains an /assets/ segment (possibly prefixed
+  // by a sub-path like "/website"), normalize to the bare `/assets/...`
+  // path so the browser requests the frontend's static asset location.
+  const assetsIdx = u.lastIndexOf("/assets/");
+  if (assetsIdx !== -1) {
+    const basename = u.slice(assetsIdx + "/assets/".length);
+    if (import.meta.env.DEV) {
+      return `${basePrefix}/${basename}`.replace(/\/+/g, "/");
+    }
+    return `${basePrefix}${u.slice(assetsIdx)}`;
+  }
+  if (u.startsWith("/@fs/") || u.startsWith("/fs/") || u.startsWith("/@id/")) return u;
+  if (!API_BASE) return u;
   return `${API_BASE}${u}`;
 }

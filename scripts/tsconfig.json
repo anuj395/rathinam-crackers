@@ -2,9 +2,16 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node"]
+    "rootDir": "..",
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "allowImportingTsExtensions": true,
+    "baseUrl": "..",
+    "paths": {
+      "@workspace/db": ["lib/db/src/index"],
+      "@workspace/*": ["*"]
+    }
   },
-  "include": ["src"],
-  "exclude": ["src/seed.ts"]
+  "include": ["src", "../lib"],
+  "exclude": ["src/seed.ts", "../node_modules", "../dist"]
 }
